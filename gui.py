@@ -11,6 +11,7 @@ from protocol import (
     build_flower_raw_command,
     build_set_state_command,
     build_vibration_command,
+    build_vibration_level_command,
 )
 from server import TCPServer
 
@@ -24,6 +25,7 @@ class WizardGUI:
 
         self.selected_device_id: str | None = None
         self.abstract_vibration_on = False
+        self.abstract_vibration_level_var = tk.DoubleVar(value=0.65)
 
         self.flower_run_var = tk.BooleanVar(value=False)
         self.flower_speed_var = tk.DoubleVar(value=0.5)
@@ -184,13 +186,7 @@ class WizardGUI:
             self._build_state_buttons(self.dynamic_controls, row=0)
         elif device_kind == "abstract_sphere":
             self._build_state_buttons(self.dynamic_controls, row=0)
-            button_text = "Stop Vibration" if self.abstract_vibration_on else "Start Vibration"
-            vibration_button = ttk.Button(
-                self.dynamic_controls,
-                text=button_text,
-                command=self.toggle_vibration,
-            )
-            vibration_button.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+            self._build_abstract_vibration_controls(self.dynamic_controls, row=1)
         elif device_kind == "flower":
             self._build_state_buttons(self.dynamic_controls, row=0)
             self._build_flower_raw_controls(self.dynamic_controls, row=1)
@@ -211,6 +207,47 @@ class WizardGUI:
                 command=lambda value=state: self.send_state(value),
             )
             button.grid(row=index // 2, column=index % 2, sticky="ew", padx=4, pady=4)
+
+    def _build_abstract_vibration_controls(self, parent: ttk.Frame, row: int) -> None:
+        vibration_frame = ttk.LabelFrame(parent, text="Vibration", padding=8)
+        vibration_frame.grid(row=row, column=0, sticky="ew", pady=(8, 0))
+        vibration_frame.columnconfigure(0, weight=1)
+
+        button_text = "Stop Vibration" if self.abstract_vibration_on else "Start Vibration"
+        vibration_button = ttk.Button(
+            vibration_frame,
+            text=button_text,
+            command=self.toggle_vibration,
+        )
+        vibration_button.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+
+        ttk.Label(vibration_frame, text="Vibration Level").grid(row=1, column=0, sticky="w")
+        level_scale = ttk.Scale(
+            vibration_frame,
+            from_=0.0,
+            to=1.0,
+            variable=self.abstract_vibration_level_var,
+            orient="horizontal",
+        )
+        level_scale.grid(row=2, column=0, sticky="ew")
+
+        level_label = ttk.Label(
+            vibration_frame,
+            text=f"level={self.abstract_vibration_level_var.get():.2f}",
+        )
+        level_label.grid(row=3, column=0, sticky="w", pady=(4, 4))
+
+        def update_level_label(*_args: object) -> None:
+            level_label.configure(text=f"level={self.abstract_vibration_level_var.get():.2f}")
+
+        self.abstract_vibration_level_var.trace_add("write", update_level_label)
+
+        send_level_button = ttk.Button(
+            vibration_frame,
+            text="Send Vibration Level",
+            command=self.send_vibration_level,
+        )
+        send_level_button.grid(row=4, column=0, sticky="ew", pady=(4, 0))
 
     def _build_flower_raw_controls(self, parent: ttk.Frame, row: int) -> None:
         raw_frame = ttk.LabelFrame(parent, text="Flower Raw", padding=8)
@@ -268,26 +305,59 @@ class WizardGUI:
         if self.selected_device_id is None:
             self.log("[gui] No device selected")
             return
-        self.server.send_message(self.selected_device_id, build_set_state_command(state))
+        device = self.registry.get(self.selected_device_id)
+        if device is None:
+            self.log(f"[gui] Unknown device: {self.selected_device_id}")
+            return
+        self.server.send_message(
+            self.selected_device_id,
+            build_set_state_command(device.device_id, state),
+        )
 
     def toggle_vibration(self) -> None:
         if self.selected_device_id is None:
             self.log("[gui] No device selected")
             return
+        device = self.registry.get(self.selected_device_id)
+        if device is None:
+            self.log(f"[gui] Unknown device: {self.selected_device_id}")
+            return
         self.abstract_vibration_on = not self.abstract_vibration_on
         self.server.send_message(
             self.selected_device_id,
-            build_vibration_command(self.abstract_vibration_on),
+            build_vibration_command(
+                device.device_id,
+                self.abstract_vibration_on,
+            ),
         )
+        self.show_controls_for_kind(device.device_kind)
+
+    def send_vibration_level(self) -> None:
+        if self.selected_device_id is None:
+            self.log("[gui] No device selected")
+            return
         device = self.registry.get(self.selected_device_id)
-        if device is not None:
-            self.show_controls_for_kind(device.device_kind)
+        if device is None:
+            self.log(f"[gui] Unknown device: {self.selected_device_id}")
+            return
+        self.server.send_message(
+            self.selected_device_id,
+            build_vibration_level_command(
+                device.device_id,
+                self.abstract_vibration_level_var.get(),
+            ),
+        )
 
     def send_flower_raw(self) -> None:
         if self.selected_device_id is None:
             self.log("[gui] No device selected")
             return
+        device = self.registry.get(self.selected_device_id)
+        if device is None:
+            self.log(f"[gui] Unknown device: {self.selected_device_id}")
+            return
         message = build_flower_raw_command(
+            device_id=device.device_id,
             run=self.flower_run_var.get(),
             speed=self.flower_speed_var.get(),
             amplitude=self.flower_amplitude_var.get(),

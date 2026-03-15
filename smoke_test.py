@@ -13,9 +13,14 @@ def main() -> None:
     messages = [
         build_hello("flower_01", "flower"),
         build_heartbeat(),
-        build_set_state_command("neutral"),
-        build_vibration_command(True),
-        build_flower_raw_command(run=True, speed=0.5, amplitude=0.75),
+        build_set_state_command("flower_01", "neutral"),
+        build_vibration_command("abstract_01", True),
+        build_flower_raw_command(
+            "flower_01",
+            run=True,
+            speed=0.5,
+            amplitude=0.75,
+        ),
     ]
 
     for message in messages:

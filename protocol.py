@@ -63,25 +63,48 @@ def build_event(device_id: str, name: str, **extra: Any) -> dict[str, Any]:
     return message
 
 
-def build_set_state_command(state: str) -> dict[str, Any]:
+def build_set_state_command(device_id: str, state: str) -> dict[str, Any]:
     return {
         "type": "command",
+        "device_id": device_id,
         "command": "set_state",
         "state": state,
     }
 
 
-def build_vibration_command(enabled: bool) -> dict[str, Any]:
+def build_vibration_command(
+    device_id: str,
+    enabled: bool,
+) -> dict[str, Any]:
     return {
         "type": "command",
+        "device_id": device_id,
         "command": "set_vibration",
         "enabled": enabled,
     }
 
 
-def build_flower_raw_command(run: bool, speed: float, amplitude: float) -> dict[str, Any]:
+def build_vibration_level_command(
+    device_id: str,
+    level: float,
+) -> dict[str, Any]:
     return {
         "type": "command",
+        "device_id": device_id,
+        "command": "set_vibration_level",
+        "level": float(level),
+    }
+
+
+def build_flower_raw_command(
+    device_id: str,
+    run: bool,
+    speed: float,
+    amplitude: float,
+) -> dict[str, Any]:
+    return {
+        "type": "command",
+        "device_id": device_id,
         "command": "set_raw",
         "run": run,
         "speed": float(speed),
