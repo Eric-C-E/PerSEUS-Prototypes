@@ -1,53 +1,71 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-H21 | ESP32-H4 | ESP32-P4 | ESP32-S2 | ESP32-S3 | Linux |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | --------- | -------- | --------- | -------- | -------- | -------- | -------- | ----- |
+# Anthro Sphere ESP Display Milestone
 
-# Hello World Example
+This ESP-IDF project brings up the first visible output for the Anthropomorphic Sphere LCD.
+It initializes an SPI ILI9341 panel with `esp_lcd`, starts LVGL through `esp_lvgl_port`,
+and renders a simple boot screen with a contrasting background and centered
+`Anthro Sphere` label.
 
-Starts a FreeRTOS task to print "Hello World".
+No animation, touch, networking, filesystem, image assets, or higher-level application
+logic is included in this milestone.
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+## Hardware Assumptions
 
-## How to use example
+- LCD controller: ILI9341
+- Resolution: 320x240
+- Interface: SPI
+- Driver component: `espressif/esp_lcd_ili9341`
+- LVGL integration: `espressif/esp_lvgl_port`
+- Backlight GPIO: not configured by default; assumed externally powered
 
-Follow detailed instructions provided specifically for this example.
+All pins below are ESP GPIO numbers, not physical header pin numbers.
 
-Select the instructions depending on Espressif chip installed on your development board:
+| LCD signal | ESP GPIO |
+| ---------- | -------- |
+| MOSI       | GPIO11   |
+| SCLK       | GPIO12   |
+| CS         | GPIO10   |
+| DC         | GPIO8    |
+| RST        | GPIO18   |
 
-- [ESP32 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/stable/get-started/index.html)
-- [ESP32-S2 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/get-started/index.html)
+MISO is not configured for this write-only display path.
 
+## Display Tuning
 
-## Example folder contents
+Edit [main/board_config.h](main/board_config.h) first if the display is blank,
+mirrored, rotated, shifted, or color-swapped.
 
-The project **hello_world** contains one source file in C language [hello_world_main.c](main/hello_world_main.c). The file is located in folder [main](main).
+Start with:
 
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt` files that provide set of directives and instructions describing the project's source files and targets (executable, library, or both).
+- `BOARD_LCD_SPI_HOST`
+- `BOARD_LCD_SPI_CLOCK_HZ`
+- `BOARD_LCD_COLOR_INVERT`
+- `BOARD_LCD_RGB_BGR`
+- `BOARD_LCD_MIRROR_X`
+- `BOARD_LCD_MIRROR_Y`
+- `BOARD_LCD_SWAP_XY`
+- `BOARD_LCD_SWAP_BYTES`
+- `BOARD_LCD_X_GAP`
+- `BOARD_LCD_Y_GAP`
+- `BOARD_LCD_PIN_BACKLIGHT`
 
-Below is short explanation of remaining files in the project folder.
+If the panel has a backlight control wire, set `BOARD_LCD_PIN_BACKLIGHT` to that
+GPIO and adjust `BOARD_LCD_BACKLIGHT_ON_LEVEL` if needed. By default it is
+`GPIO_NUM_NC`, so the firmware does not drive a backlight pin.
 
+## Build, Flash, Monitor
+
+From this project root:
+
+```powershell
+idf.py build
+idf.py flash
+idf.py monitor
 ```
-├── CMakeLists.txt
-├── pytest_hello_world.py      Python script used for automated testing
-├── main
-│   ├── CMakeLists.txt
-│   └── hello_world_main.c
-└── README.md                  This is the file you are currently reading
+
+Or specify the port:
+
+```powershell
+idf.py -p COM3 build flash monitor
 ```
 
-For more information on structure and contents of ESP-IDF projects, please refer to Section [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html) of the ESP-IDF Programming Guide.
-
-## Troubleshooting
-
-* Program upload failure
-
-    * Hardware connection is not correct: run `idf.py -p PORT monitor`, and reboot your board to see if there are any output logs.
-    * The baud rate for downloading is too high: lower your baud rate in the `menuconfig` menu, and try again.
-
-## Technical support and feedback
-
-Please use the following feedback channels:
-
-* For technical queries, go to the [esp32.com](https://esp32.com/) forum
-* For a feature request or bug report, create a [GitHub issue](https://github.com/espressif/esp-idf/issues)
-
-We will get back to you as soon as possible.
+Press `Ctrl+]` to exit the monitor.
