@@ -5,15 +5,15 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 
-from device_registry import DeviceRegistry
-from protocol import (
+from perseus_shared.protocol import (
     VALID_STATES,
     build_flower_raw_command,
     build_set_state_command,
     build_vibration_command,
     build_vibration_level_command,
 )
-from server import TCPServer
+from .device_registry import DeviceRegistry
+from .server import TCPServer
 
 
 class WizardGUI:

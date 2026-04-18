@@ -1,4 +1,4 @@
-from protocol import (
+from .protocol import (
     build_flower_raw_command,
     build_heartbeat,
     build_hello,

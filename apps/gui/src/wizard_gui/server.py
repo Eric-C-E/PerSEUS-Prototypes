@@ -5,8 +5,9 @@ import socket
 import threading
 from typing import Any, Callable
 
-from device_registry import DeviceRegistry
-from protocol import encode_message, parse_json_line
+from perseus_shared.protocol import encode_message, parse_json_line
+
+from .device_registry import DeviceRegistry
 
 
 LogCallback = Callable[[str], None]

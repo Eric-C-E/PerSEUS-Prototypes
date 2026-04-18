@@ -1,0 +1,51 @@
+# =========================
+# ESP-IDF Build Artifacts
+# =========================
+build/
+sdkconfig
+sdkconfig.old
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# Ninja / Make
+*.ninja
+*.make
+
+# =========================
+# ESP-IDF Managed Components
+# =========================
+managed_components/
+dependencies.lock
+
+# =========================
+# Python / Virtual Env
+# =========================
+.venv/
+env/
+venv/
+__pycache__/
+*.pyc
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# OS / System Junk
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs / Temp
+# =========================
+*.log
+
+# =========================
+# ESP-IDF Tools (just in case)
+# =========================
+.espressif/

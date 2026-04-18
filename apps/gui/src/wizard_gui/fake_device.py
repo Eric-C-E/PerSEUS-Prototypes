@@ -6,7 +6,13 @@ import sys
 import threading
 import time
 
-from protocol import build_event, build_heartbeat, build_hello, encode_message, parse_json_line
+from perseus_shared.protocol import (
+    build_event,
+    build_heartbeat,
+    build_hello,
+    encode_message,
+    parse_json_line,
+)
 
 
 def recv_loop(sock: socket.socket) -> None:

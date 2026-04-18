@@ -1,8 +1,8 @@
 import tkinter as tk
 
-from device_registry import DeviceRegistry
-from gui import WizardGUI
-from server import TCPServer
+from .device_registry import DeviceRegistry
+from .gui import WizardGUI
+from .server import TCPServer
 
 
 def main() -> None:
