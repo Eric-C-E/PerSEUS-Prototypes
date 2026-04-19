@@ -19,7 +19,9 @@ class DeviceRecord:
     conn: socket.socket | None = None
     address: tuple[str, int] | None = None
     last_seen: str = field(default_factory=now_iso)
+    last_heartbeat: str = ""
     last_event: str = ""
+    reset_requested: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -27,7 +29,9 @@ class DeviceRecord:
             "device_kind": self.device_kind,
             "connected": self.connected,
             "last_seen": self.last_seen,
+            "last_heartbeat": self.last_heartbeat,
             "last_event": self.last_event,
+            "reset_requested": self.reset_requested,
         }
 
 
@@ -62,12 +66,22 @@ class DeviceRegistry:
             if device is not None:
                 device.last_seen = now_iso()
 
+    def mark_heartbeat(self, device_id: str) -> None:
+        with self._lock:
+            device = self._devices.get(device_id)
+            if device is not None:
+                timestamp = now_iso()
+                device.last_seen = timestamp
+                device.last_heartbeat = timestamp
+
     def update_event(self, device_id: str, event_name: str) -> None:
         with self._lock:
             device = self._devices.get(device_id)
             if device is not None:
                 device.last_seen = now_iso()
                 device.last_event = event_name
+                if event_name in {"reset_requested", "reset_request"}:
+                    device.reset_requested = True
 
     def disconnect_by_id(self, device_id: str) -> None:
         with self._lock:

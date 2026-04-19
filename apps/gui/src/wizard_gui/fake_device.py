@@ -63,8 +63,8 @@ def event_loop(sock: socket.socket, device_id: str, interval: float) -> None:
             return
 
 
-def keyboard_loop(sock: socket.socket, device_id: str) -> None:
-    print("[fake_device] Press Enter to send a moved event. Ctrl+C to quit.")
+def keyboard_loop(sock: socket.socket, device_id: str, event_name: str) -> None:
+    print(f"[fake_device] Press Enter to send a {event_name} event. Ctrl+C to quit.")
     while True:
         try:
             input()
@@ -72,7 +72,7 @@ def keyboard_loop(sock: socket.socket, device_id: str) -> None:
             return
 
         try:
-            message = build_event(device_id, "moved")
+            message = build_event(device_id, event_name)
             sock.sendall(encode_message(message))
             print(f"[fake_device] sent event: {message}")
         except OSError as exc:
@@ -105,7 +105,13 @@ def main() -> None:
     parser.add_argument(
         "--keyboard-events",
         action="store_true",
-        help="Send a moved event when Enter is pressed.",
+        help="Send the selected keyboard event when Enter is pressed.",
+    )
+    parser.add_argument(
+        "--keyboard-event-name",
+        default="moved",
+        choices=["moved", "reset_requested"],
+        help="Event name sent by --keyboard-events.",
     )
     args = parser.parse_args()
 
@@ -137,7 +143,7 @@ def main() -> None:
         event_thread.start()
 
     if args.keyboard_events:
-        keyboard_loop(sock, args.device_id)
+        keyboard_loop(sock, args.device_id, args.keyboard_event_name)
     else:
         try:
             while recv_thread.is_alive():

@@ -153,7 +153,7 @@ class TCPServer:
             self.log(f"[server] Heartbeat missing device_id: {message}")
             return
 
-        self.registry.mark_seen(device_id)
+        self.registry.mark_heartbeat(device_id)
         self.log(f"[server] Heartbeat received from {device_id}")
         self._notify_gui("device_list_changed")
 
