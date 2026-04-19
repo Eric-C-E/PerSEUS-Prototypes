@@ -8,6 +8,8 @@
 
 static const char *TAG = "ui_boot";
 
+static lv_obj_t *s_root;
+
 esp_err_t ui_boot_create(void)
 {
     ESP_LOGI(TAG, "UI creation");
@@ -21,16 +23,19 @@ esp_err_t ui_boot_create(void)
     lv_obj_set_style_bg_color(screen, lv_color_hex(0x0047AB), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
 
-    lv_obj_t *label = lv_label_create(screen);
-    lv_label_set_text(label, "Anthro Sphere");
-    lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(label, lv_color_hex(0x111111), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(label, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_pad_hor(label, 16, LV_PART_MAIN);
-    lv_obj_set_style_pad_ver(label, 8, LV_PART_MAIN);
-    lv_obj_center(label);
+    s_root = lv_obj_create(screen);
+    lv_obj_remove_style_all(s_root);
+    lv_obj_set_size(s_root, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_style_bg_color(s_root, lv_color_hex(0x0047AB), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s_root, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_center(s_root);
 
     lvgl_port_unlock();
 
     return ESP_OK;
+}
+
+lv_obj_t *ui_boot_get_root(void)
+{
+    return s_root;
 }
