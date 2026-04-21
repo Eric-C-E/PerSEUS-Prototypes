@@ -69,7 +69,8 @@ Reset-request light behavior:
   - `set_state` - Set emotional state.
   - `set_vibration` - Enable/disable vibration for `abstract_sphere`.
   - `set_vibration_level` - Set vibration intensity as a float, normally 0.0-1.0.
-  - `set_raw` - Raw motor control for `flower` device with `run`, `speed`, and `amplitude`.
+  - `set_raw` - Rotation control for `flower` device with `run`, `speed`, and `amplitude`.
+  - `set_tilt` - Tilt control for `flower` device with normalized `tilt`.
 
 Note: The shared builders currently construct messages but do not validate or clamp values. The GUI constrains normal user input through buttons/sliders.
 
@@ -85,7 +86,7 @@ Note: The shared builders currently construct messages but do not validate or cl
 |-------------|----------|
 | `anthro_sphere` | Reset-request light + state buttons |
 | `abstract_sphere` | Reset-request light + state buttons + hold-to-vibrate button + vibration level |
-| `flower` | Reset-request light + state buttons + raw motor controls (run/speed/amplitude) |
+| `flower` | Reset-request light + state buttons + raw flower rotation controls (run/speed/amplitude) + flower tilt control |
 
 ## Running the Application
 
@@ -181,10 +182,16 @@ For `abstract_sphere`, the GUI uses this as a hold command:
 {"type": "command", "device_id": "device-001", "command": "set_vibration_level", "level": 0.75}
 ```
 
-**set_raw** (flower only):
+**set_raw** rotation command (flower only):
 
 ```json
 {"type": "command", "device_id": "flower-001", "command": "set_raw", "run": true, "speed": 0.5, "amplitude": 0.8}
+```
+
+**set_tilt** (flower only):
+
+```json
+{"type": "command", "device_id": "flower-001", "command": "set_tilt", "tilt": 0.5}
 ```
 
 ## Current Limitations

@@ -89,10 +89,10 @@ Known event names:
 | Event | GUI behavior |
 |---|---|
 | `moved` | Shows as the device's latest event in the device list. |
-| `reset_requested` | Turns the selected device's reset-request indicator red. |
+| `reset_requested` | Latches the selected device's reset-request indicator red. |
 | `reset_request` | Also accepted as a reset-request alias. |
-
-The reset-request flag is held in GUI memory and clears when the WOO operator sends the next command to that same device. There is no clear or acknowledge command in the current protocol.
+\
+The reset-request flag is currently latched in GUI memory. There is no clear or acknowledge command in the current protocol.
 
 ## Common GUI Commands
 
@@ -244,8 +244,7 @@ GUI controls available:
 | Control | Command sent to device |
 |---|---|
 | State buttons | `set_state` |
-| Raw flower rotation controls: run checkbox plus speed/amplitude sliders | `set_raw` |
-| Flower tilt control slider | `set_tilt` |
+| Raw motor run checkbox plus speed/amplitude sliders | `set_raw` |
 | Reset-request light | Driven by device event `reset_requested` or `reset_request` |
 
 Commands the flower must implement:
@@ -254,9 +253,8 @@ Commands the flower must implement:
 |---|---:|---|
 | `set_state` | yes | `state: string` |
 | `set_raw` | yes | `run: boolean`, `speed: number`, `amplitude: number` |
-| `set_tilt` | yes | `tilt: number` |
 
-### `set_raw` Rotation Command
+### `set_raw`
 
 ```json
 {"type":"command","device_id":"flower_01","command":"set_raw","run":true,"speed":0.5,"amplitude":0.8}
@@ -276,24 +274,6 @@ Client responsibility:
 - Stop or idle the raw motor behavior when `run` is `false`.
 - Use safe motor limits independent of GUI input; the GUI builders do not validate or clamp values.
 - Decide locally how `set_state` interacts with raw mode. A conservative policy is for `set_raw` to override direct motor output while active and for `set_state` to update the desired emotional behavior for when raw mode is not active.
-
-### `set_tilt`
-
-```json
-{"type":"command","device_id":"flower_01","command":"set_tilt","tilt":0.5}
-```
-
-Fields:
-
-| Field | Type | Values |
-|---|---:|---|
-| `tilt` | number | GUI slider sends `0.0` to `1.0` |
-
-Client responsibility:
-
-- Clamp `tilt` locally to `[0.0, 1.0]`.
-- Map the normalized tilt value to the flower's safe physical tilt range.
-- Use safe actuator limits independent of GUI input; the GUI builder does not validate or clamp values.
 
 Recommended event support:
 

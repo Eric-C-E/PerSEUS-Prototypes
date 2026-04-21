@@ -39,8 +39,8 @@ Look for the IPv4 address on the hotspot adapter. On Windows this is commonly:
 Example ESP32-side configuration:
 
 ```c
-#define WIFI_SSID "GOUGTOP 5437"
-#define WIFI_PASSWORD "8,F49k20"
+#define WIFI_SSID "YourHotspotSSID"
+#define WIFI_PASSWORD "YourHotspotPassword"
 #define GUI_HOST "192.168.137.1"
 #define GUI_PORT 9000
 ```

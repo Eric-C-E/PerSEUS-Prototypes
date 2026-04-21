@@ -1,5 +1,6 @@
 from .protocol import (
     build_flower_raw_command,
+    build_flower_tilt_command,
     build_heartbeat,
     build_hello,
     build_set_state_command,
@@ -21,6 +22,7 @@ def main() -> None:
             speed=0.5,
             amplitude=0.75,
         ),
+        build_flower_tilt_command("flower_01", tilt=0.5),
     ]
 
     for message in messages:

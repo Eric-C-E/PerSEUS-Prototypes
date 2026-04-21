@@ -110,3 +110,15 @@ def build_flower_raw_command(
         "speed": float(speed),
         "amplitude": float(amplitude),
     }
+
+
+def build_flower_tilt_command(
+    device_id: str,
+    tilt: float,
+) -> dict[str, Any]:
+    return {
+        "type": "command",
+        "device_id": device_id,
+        "command": "set_tilt",
+        "tilt": float(tilt),
+    }

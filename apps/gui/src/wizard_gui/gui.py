@@ -11,6 +11,7 @@ from typing import Any
 from perseus_shared.protocol import (
     VALID_STATES,
     build_flower_raw_command,
+    build_flower_tilt_command,
     build_set_state_command,
     build_vibration_command,
     build_vibration_level_command,
@@ -36,6 +37,7 @@ class WizardGUI:
         self.flower_run_var = tk.BooleanVar(value=False)
         self.flower_speed_var = tk.DoubleVar(value=0.5)
         self.flower_amplitude_var = tk.DoubleVar(value=0.5)
+        self.flower_tilt_var = tk.DoubleVar(value=0.5)
         self.reset_light_canvas: tk.Canvas | None = None
         self.reset_light_oval: int | None = None
         self._last_periodic_refresh = 0.0
@@ -245,6 +247,7 @@ class WizardGUI:
         elif device_kind == "flower":
             self._build_state_buttons(self.dynamic_controls, row=1)
             self._build_flower_raw_controls(self.dynamic_controls, row=2)
+            self._build_flower_tilt_controls(self.dynamic_controls, row=3)
         else:
             label = ttk.Label(self.dynamic_controls, text=f"No controls for {device_kind}")
             label.grid(row=1, column=0, sticky="w")
@@ -347,7 +350,7 @@ class WizardGUI:
         send_level_button.grid(row=4, column=0, sticky="ew", pady=(4, 0))
 
     def _build_flower_raw_controls(self, parent: ttk.Frame, row: int) -> None:
-        raw_frame = ttk.LabelFrame(parent, text="Flower Raw", padding=8)
+        raw_frame = ttk.LabelFrame(parent, text="Raw Flower Rotation Controls", padding=8)
         raw_frame.grid(row=row, column=0, sticky="ew", pady=(8, 0))
         raw_frame.columnconfigure(1, weight=1)
 
@@ -392,11 +395,51 @@ class WizardGUI:
         self.flower_speed_var.trace_add("write", update_value_label)
         self.flower_amplitude_var.trace_add("write", update_value_label)
 
-        send_button = ttk.Button(raw_frame, text="Send Raw Command", command=self.send_flower_raw)
+        send_button = ttk.Button(
+            raw_frame,
+            text="Send Rotation Command",
+            command=self.send_flower_raw,
+        )
         send_button.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(8, 0))
 
     def _format_flower_values(self, speed: float, amplitude: float) -> str:
         return f"speed={speed:.2f} amplitude={amplitude:.2f}"
+
+    def _build_flower_tilt_controls(self, parent: ttk.Frame, row: int) -> None:
+        tilt_frame = ttk.LabelFrame(parent, text="Flower Tilt Control", padding=8)
+        tilt_frame.grid(row=row, column=0, sticky="ew", pady=(8, 0))
+        tilt_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(tilt_frame, text="Tilt").grid(row=0, column=0, sticky="w")
+        tilt_scale = ttk.Scale(
+            tilt_frame,
+            from_=0.0,
+            to=1.0,
+            variable=self.flower_tilt_var,
+            orient="horizontal",
+        )
+        tilt_scale.grid(row=0, column=1, sticky="ew", padx=(8, 0))
+
+        value_label = ttk.Label(
+            tilt_frame,
+            text=self._format_flower_tilt(self.flower_tilt_var.get()),
+        )
+        value_label.grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 4))
+
+        def update_value_label(*_args: object) -> None:
+            value_label.configure(text=self._format_flower_tilt(self.flower_tilt_var.get()))
+
+        self.flower_tilt_var.trace_add("write", update_value_label)
+
+        send_button = ttk.Button(
+            tilt_frame,
+            text="Send Tilt Command",
+            command=self.send_flower_tilt,
+        )
+        send_button.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+
+    def _format_flower_tilt(self, tilt: float) -> str:
+        return f"tilt={tilt:.2f}"
 
     def send_state(self, state: str) -> None:
         if self.selected_device_id is None:
@@ -473,5 +516,19 @@ class WizardGUI:
             run=self.flower_run_var.get(),
             speed=self.flower_speed_var.get(),
             amplitude=self.flower_amplitude_var.get(),
+        )
+        self.send_operator_message(device.device_id, message)
+
+    def send_flower_tilt(self) -> None:
+        if self.selected_device_id is None:
+            self.log("[gui] No device selected")
+            return
+        device = self.registry.get(self.selected_device_id)
+        if device is None:
+            self.log(f"[gui] Unknown device: {self.selected_device_id}")
+            return
+        message = build_flower_tilt_command(
+            device_id=device.device_id,
+            tilt=self.flower_tilt_var.get(),
         )
         self.send_operator_message(device.device_id, message)
