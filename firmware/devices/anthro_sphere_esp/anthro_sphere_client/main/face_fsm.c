@@ -21,12 +21,15 @@ typedef struct {
     face_state_t target_state;
     face_fsm_mode_t mode;
     TimerHandle_t blink_timer;
+#if FACE_FSM_ENABLE_DEMO_CYCLE
     TimerHandle_t demo_state_timer;
     size_t demo_state_index;
+#endif
 } face_fsm_ctx_t;
 
 static face_fsm_ctx_t s_fsm;
 
+#if FACE_FSM_ENABLE_DEMO_CYCLE
 static const face_state_t s_demo_state_cycle[] = {
     FACE_STATE_LOW_NEG,
     FACE_STATE_LOW_POS,
@@ -34,6 +37,7 @@ static const face_state_t s_demo_state_cycle[] = {
     FACE_STATE_HIGH_POS,
     FACE_STATE_NEUTRAL,
 };
+#endif
 
 static void enter_idle_loop_from_lvgl(void)
 {
@@ -97,6 +101,7 @@ static void blink_timer_cb(TimerHandle_t timer)
     ESP_ERROR_CHECK(face_renderer_play_animation(face_assets_blink_for_state(s_fsm.state)));
 }
 
+#if FACE_FSM_ENABLE_DEMO_CYCLE
 static void demo_state_timer_cb(TimerHandle_t timer)
 {
     (void)timer;
@@ -107,6 +112,7 @@ static void demo_state_timer_cb(TimerHandle_t timer)
 
     ESP_ERROR_CHECK(face_fsm_request_state(target));
 }
+#endif
 
 esp_err_t face_fsm_request_state(face_state_t target_state)
 {
@@ -145,7 +151,9 @@ esp_err_t face_fsm_init(void)
     s_fsm.state = FACE_STATE_NEUTRAL;
     s_fsm.target_state = FACE_STATE_NEUTRAL;
     s_fsm.mode = FACE_FSM_MODE_IDLE;
+#if FACE_FSM_ENABLE_DEMO_CYCLE
     s_fsm.demo_state_index = 0;
+#endif
 
     face_renderer_set_animation_done_callback(animation_done_cb, NULL);
     ESP_RETURN_ON_ERROR(face_renderer_play_animation(face_assets_idle_for_state(s_fsm.state)),
@@ -163,6 +171,7 @@ esp_err_t face_fsm_init(void)
                         TAG,
                         "failed to start blink timer");
 
+#if FACE_FSM_ENABLE_DEMO_CYCLE
     s_fsm.demo_state_timer = xTimerCreate("face_demo_state",
                                           pdMS_TO_TICKS(FACE_DEMO_STATE_PERIOD_MS),
                                           pdTRUE,
@@ -173,6 +182,9 @@ esp_err_t face_fsm_init(void)
                         ESP_FAIL,
                         TAG,
                         "failed to start demo timer");
+#else
+    ESP_LOGI(TAG, "Demo state cycle disabled; waiting for GUI set_state commands");
+#endif
 
     return ESP_OK;
 }

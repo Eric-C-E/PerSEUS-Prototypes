@@ -70,6 +70,70 @@ idf.py -p COM3 build flash monitor
 
 Press `Ctrl+]` to exit the monitor.
 
+## Wizard GUI Client
+
+This firmware is an Anthro Sphere TCP client for the Wizard-of-Oz GUI.
+
+Edit [main/client_config.h](main/client_config.h) before flashing:
+
+- `DEVICE_CLIENT_ID`: stable ID announced to the GUI, currently `anthro_01`
+- `DEVICE_CLIENT_KIND`: `anthro_sphere`
+- `DEVICE_CLIENT_GUI_HOST`: GUI computer IPv4 address
+- `DEVICE_CLIENT_GUI_PORT`: `9000`
+- `DEVICE_WIFI_SSID`
+- `DEVICE_WIFI_PASSWORD`
+
+Runtime behavior:
+
+- connects to Wi-Fi as a station
+- opens a TCP client connection to the GUI
+- sends `hello` immediately after every connection
+- sends `heartbeat` every 5 seconds
+- receives one UTF-8 JSON object per newline
+- ignores malformed JSON, unknown commands, and commands for other device IDs
+- handles Anthro Sphere `set_state` commands only
+- reconnects with backoff if the socket drops
+
+GUI state mapping:
+
+| GUI state | Local face state |
+| --------- | ---------------- |
+| `neutral` | `FACE_STATE_NEUTRAL` |
+| `low_negative` | `FACE_STATE_LOW_NEG` |
+| `low_positive` | `FACE_STATE_LOW_POS` |
+| `high_negative` | `FACE_STATE_HIGH_NEG` |
+| `high_positive` | `FACE_STATE_HIGH_POS` |
+
+The previous 10-second demo state cycle is disabled by default with
+`FACE_FSM_ENABLE_DEMO_CYCLE 0`; GUI `set_state` commands now drive the face.
+Local blinking still happens every 3 seconds.
+
+## Motion Reset Skeleton
+
+[main/motion_reset.c](main/motion_reset.c) is a reusable skeleton for future
+MPU6050-based shake/touch detection. The MPU6050 hardware driver is not
+implemented yet.
+
+Future shake detection should call:
+
+```c
+motion_reset_raise_shake_flag();
+```
+
+That binary flag path already reports the Wizard GUI event:
+
+```json
+{"type":"event","device_id":"anthro_01","event":"reset_requested"}
+```
+
+There is also a reserved hook:
+
+```c
+motion_reset_raise_touch_flag();
+```
+
+for future touch-like motion detection if another device needs it.
+
 ## Face Renderer Milestone
 
 The project now has a pre-drawn-frame face renderer layered on top of LVGL:
