@@ -83,6 +83,16 @@ class DeviceRegistry:
                 if event_name in {"reset_requested", "reset_request"}:
                     device.reset_requested = True
 
+    def clear_reset_requested(self, device_id: str) -> bool:
+        with self._lock:
+            device = self._devices.get(device_id)
+            if device is None or not device.reset_requested:
+                return False
+
+            device.reset_requested = False
+            device.last_seen = now_iso()
+            return True
+
     def disconnect_by_id(self, device_id: str) -> None:
         with self._lock:
             device = self._devices.get(device_id)

@@ -57,7 +57,8 @@ Reset-request light behavior:
 - Appears in the controls section for every selected device type.
 - Gray/off by default.
 - Red/on once that selected device sends `event=reset_requested` or `event=reset_request`.
-- This flag is currently latched in memory and is not persisted.
+- Cleared when the WOO operator sends the next command to that same device.
+- This flag is held only in memory and is not persisted.
 
 ### 4. Protocol (`shared/python/perseus_shared/protocol.py`)
 
@@ -190,7 +191,7 @@ For `abstract_sphere`, the GUI uses this as a hold command:
 
 - No authentication or encryption.
 - No persistent storage of device state.
-- Reset-request flags are latched only in memory and currently have no clear/ack command.
+- Reset-request flags are held only in memory and clear on the next WOO operator command to that device. There is no protocol-level clear/ack command.
 - The GUI event loop is single-threaded; the server uses background threads.
 - No client-side reconnection logic in the fake device.
 - `device_id` uniqueness is assumed. If two clients announce the same `device_id`, they target the same registry entry.

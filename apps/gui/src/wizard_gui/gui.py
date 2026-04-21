@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
+from typing import Any
 
 from perseus_shared.protocol import (
     VALID_STATES,
@@ -405,10 +406,15 @@ class WizardGUI:
         if device is None:
             self.log(f"[gui] Unknown device: {self.selected_device_id}")
             return
-        self.server.send_message(
-            self.selected_device_id,
+        self.send_operator_message(
+            device.device_id,
             build_set_state_command(device.device_id, state),
         )
+
+    def send_operator_message(self, device_id: str, message: dict[str, Any]) -> None:
+        if self.registry.clear_reset_requested(device_id):
+            self.update_reset_light()
+        self.server.send_message(device_id, message)
 
     def start_vibration_hold(self, _event: object | None = None) -> None:
         if self.abstract_vibration_on:
@@ -430,8 +436,8 @@ class WizardGUI:
         if device is None:
             self.log(f"[gui] Unknown device: {self.selected_device_id}")
             return
-        self.server.send_message(
-            self.selected_device_id,
+        self.send_operator_message(
+            device.device_id,
             build_vibration_command(
                 device.device_id,
                 enabled,
@@ -446,8 +452,8 @@ class WizardGUI:
         if device is None:
             self.log(f"[gui] Unknown device: {self.selected_device_id}")
             return
-        self.server.send_message(
-            self.selected_device_id,
+        self.send_operator_message(
+            device.device_id,
             build_vibration_level_command(
                 device.device_id,
                 self.abstract_vibration_level_var.get(),
@@ -468,4 +474,4 @@ class WizardGUI:
             speed=self.flower_speed_var.get(),
             amplitude=self.flower_amplitude_var.get(),
         )
-        self.server.send_message(self.selected_device_id, message)
+        self.send_operator_message(device.device_id, message)

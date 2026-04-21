@@ -89,10 +89,10 @@ Known event names:
 | Event | GUI behavior |
 |---|---|
 | `moved` | Shows as the device's latest event in the device list. |
-| `reset_requested` | Latches the selected device's reset-request indicator red. |
+| `reset_requested` | Turns the selected device's reset-request indicator red. |
 | `reset_request` | Also accepted as a reset-request alias. |
 
-The reset-request flag is currently latched in GUI memory. There is no clear or acknowledge command in the current protocol.
+The reset-request flag is held in GUI memory and clears when the WOO operator sends the next command to that same device. There is no clear or acknowledge command in the current protocol.
 
 ## Common GUI Commands
 
