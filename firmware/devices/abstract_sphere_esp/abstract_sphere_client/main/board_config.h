@@ -14,7 +14,7 @@
 #define BOARD_SPI_PIN_SCLK              GPIO_NUM_12
 #define BOARD_SPI_PIN_CS                GPIO_NUM_10
 
-#define BOARD_MPU6050_I2C_PORT          I2C_NUM_0
+    #define BOARD_MPU6050_I2C_PORT          I2C_NUM_0
 #define BOARD_MPU6050_PIN_SDA           GPIO_NUM_4
 #define BOARD_MPU6050_PIN_SCL           GPIO_NUM_5
 #define BOARD_MPU6050_I2C_CLOCK_HZ      (100 * 1000)

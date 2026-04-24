@@ -42,6 +42,20 @@ Expect these values to change during hardware testing:
 Be conservative with servo limits. The GUI may send out-of-range numeric values;
 firmware must clamp before driving actuators.
 
+Recent servo calibration experiment:
+
+- The standalone calibrator was run against the current Flower mechanism.
+- Both MG995 servos behaved like standard positional servos, not continuous
+  rotation servos.
+- `1500 us` behaved as the practical neutral/center pulse.
+- The tested usable travel was close to 170 degrees without obvious binding.
+- Current production values were updated to the calibrator's full shared range:
+  `BOARD_SERVO_MIN_PULSE_US=500`, `BOARD_SERVO_MAX_PULSE_US=2500`, tilt
+  `0/90/180`, rotation `0/90/180`, and both reversal flags `0`.
+- If dashboard poses or raw oscillation produce buzzing near the extremes,
+  narrow the angle range or repeat calibration with a larger margin, for
+  example `5.0f` to `175.0f`.
+
 ## Wizard GUI TCP Client
 
 This firmware implements the Flower section of `main/device_client_interface.md`.
@@ -194,8 +208,26 @@ Use it to find safe servo pulse limits, center positions, and reversal flags.
 It prints serial-console instructions at runtime and can emit ready-to-paste
 `main/board_config.h` values.
 
+During the latest test, the original calibrator `fgets(stdin)` loop repeatedly
+printed `cal>` and did not accept input on the user's ESP32-S3 monitor setup.
+The calibrator was changed to install the UART driver and read commands with
+`uart_read_bytes()` directly, with local echo/backspace handling. Keep that
+direct-UART input path unless a later ESP-IDF console configuration proves a
+cleaner interactive input path on this board.
+
 Current production firmware uses one shared pulse range for both axes, so the
 calibrator prints the safe overlapping pulse range. If physical testing shows
 the tilt and rotation servos need substantially different pulse limits, update
 `main/flower_servo.c` to support per-axis pulse min/max before applying tight
 per-axis limits.
+
+Safe calibration practice:
+
+- Do not intentionally bind the mechanism to discover limits.
+- Approach endpoints in small pulse steps, stop when motion slows, buzzing
+  increases, or the linkage approaches a hard stop, then back off before
+  marking `min` or `max`.
+- MG995 servo position is controlled mainly by pulse width at 50 Hz; typical
+  values are roughly `1000 us` one side, `1500 us` center, and `2000 us` the
+  other side, although these units accepted `500-2500 us` in the current
+  mechanism.

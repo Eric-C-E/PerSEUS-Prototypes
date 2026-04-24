@@ -6,11 +6,13 @@
 #include <string.h>
 
 #include "driver/ledc.h"
+#include "driver/uart.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/gpio_types.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "servo_calibrator";
 
@@ -29,6 +31,12 @@ static const char *TAG = "servo_calibrator";
 #define CAL_STEP_US                   10
 #define CAL_SWEEP_STEP_US             25
 #define CAL_SWEEP_DELAY_MS            120
+
+#ifdef CONFIG_ESP_CONSOLE_UART_NUM
+#define CAL_CONSOLE_UART_NUM          CONFIG_ESP_CONSOLE_UART_NUM
+#else
+#define CAL_CONSOLE_UART_NUM          UART_NUM_0
+#endif
 
 typedef enum {
     AXIS_TILT = 0,
@@ -403,8 +411,56 @@ static esp_err_t pwm_init(void)
     return ESP_OK;
 }
 
+static esp_err_t console_stdin_init(void)
+{
+    setvbuf(stdout, NULL, _IONBF, 0);
+
+    esp_err_t ret = uart_driver_install(CAL_CONSOLE_UART_NUM, 256, 0, 0, NULL, 0);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        return ret;
+    }
+
+    return ESP_OK;
+}
+
+static bool console_read_line(char *line, size_t line_size)
+{
+    if (!line || line_size == 0) {
+        return false;
+    }
+
+    size_t len = 0;
+    while (true) {
+        uint8_t ch = 0;
+        int read_len = uart_read_bytes(CAL_CONSOLE_UART_NUM, &ch, 1, portMAX_DELAY);
+        if (read_len <= 0) {
+            continue;
+        }
+
+        if (ch == '\r' || ch == '\n') {
+            line[len] = '\0';
+            printf("\n");
+            return true;
+        }
+
+        if (ch == '\b' || ch == 0x7f) {
+            if (len > 0) {
+                len--;
+                printf("\b \b");
+            }
+            continue;
+        }
+
+        if (isprint((unsigned char)ch) && len < line_size - 1) {
+            line[len++] = (char)ch;
+            putchar(ch);
+        }
+    }
+}
+
 void app_main(void)
 {
+    ESP_ERROR_CHECK(console_stdin_init());
     ESP_ERROR_CHECK(pwm_init());
 
     for (int i = 0; i < AXIS_COUNT; i++) {
@@ -418,12 +474,10 @@ void app_main(void)
         printf("cal> ");
         fflush(stdout);
 
-        if (!fgets(line, sizeof(line), stdin)) {
-            vTaskDelay(pdMS_TO_TICKS(100));
+        if (!console_read_line(line, sizeof(line))) {
             continue;
         }
 
-        line[strcspn(line, "\r\n")] = '\0';
         handle_command(line);
     }
 }
