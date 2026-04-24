@@ -1,5 +1,6 @@
 #include "wifi_connect.h"
 
+#include <inttypes.h>
 #include <string.h>
 
 #include "client_config.h"
@@ -15,11 +16,10 @@
 static const char *TAG = "wifi_connect";
 
 #define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
-#define WIFI_MAX_RETRY     10
+#define WIFI_RETRY_LOG_PERIOD 10
 
 static EventGroupHandle_t s_wifi_event_group;
-static int s_retry_count;
+static uint32_t s_retry_count;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -31,12 +31,16 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     }
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_count < WIFI_MAX_RETRY) {
-            s_retry_count++;
-            ESP_LOGW(TAG, "Wi-Fi disconnected; retry %d/%d", s_retry_count, WIFI_MAX_RETRY);
-            esp_wifi_connect();
-        } else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+
+        s_retry_count++;
+        if (s_retry_count == 1 || (s_retry_count % WIFI_RETRY_LOG_PERIOD) == 0) {
+            ESP_LOGW(TAG, "Wi-Fi disconnected; retry %" PRIu32 " and will keep trying", s_retry_count);
+        }
+
+        esp_err_t ret = esp_wifi_connect();
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Wi-Fi reconnect request failed: %s", esp_err_to_name(ret));
         }
         return;
     }
@@ -101,15 +105,12 @@ esp_err_t wifi_connect_start(void)
 
     ESP_LOGI(TAG, "Connecting to SSID '%s'", DEVICE_WIFI_SSID);
     const EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-                                                 WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+                                                 WIFI_CONNECTED_BIT,
                                                  pdFALSE,
                                                  pdFALSE,
                                                  portMAX_DELAY);
 
-    ESP_RETURN_ON_FALSE((bits & WIFI_CONNECTED_BIT) != 0,
-                        ESP_FAIL,
-                        TAG,
-                        "Failed to connect to Wi-Fi");
+    ESP_RETURN_ON_FALSE((bits & WIFI_CONNECTED_BIT) != 0, ESP_FAIL, TAG, "Failed to connect to Wi-Fi");
 
     return ESP_OK;
 }

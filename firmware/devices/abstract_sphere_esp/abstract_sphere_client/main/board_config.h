@@ -22,5 +22,7 @@
 /* DRV8833: GPIO16 -> IN1, IN2 tied low for one-direction vibration. */
 #define BOARD_VIBE_MOTOR_PWM_PIN        GPIO_NUM_16
 
-/* Future LED ring output placeholder. GPIO_NUM_NC means not wired yet. */
-#define BOARD_LED_RING_PIN              GPIO_NUM_NC
+/* WS2812B-compatible 24-LED ring. GPIO drives ring DI; DO is unused. */
+#define BOARD_LED_RING_PIN              GPIO_NUM_17
+#define BOARD_LED_RING_COUNT            24
+#define BOARD_LED_RING_BRIGHTNESS_PERCENT 8
