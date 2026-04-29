@@ -25,4 +25,4 @@
 /* WS2812B-compatible 24-LED ring. GPIO drives ring DI; DO is unused. */
 #define BOARD_LED_RING_PIN              GPIO_NUM_17
 #define BOARD_LED_RING_COUNT            24
-#define BOARD_LED_RING_BRIGHTNESS_PERCENT 8
+#define BOARD_LED_RING_BRIGHTNESS_PERCENT 75

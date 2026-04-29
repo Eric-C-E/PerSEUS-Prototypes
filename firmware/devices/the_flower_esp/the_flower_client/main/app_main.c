@@ -15,7 +15,13 @@ static void motion_reset_event_cb(motion_reset_source_t source, void *user_ctx)
 
     const char *source_name = (source == MOTION_RESET_SOURCE_SHAKE) ? "shake" : "touch";
     ESP_LOGI(TAG, "Motion reset requested by %s", source_name);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(device_client_send_event("reset_requested"));
+
+    esp_err_t ret = device_client_send_event("reset_requested");
+    if (ret == ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "GUI not connected; reset_requested event not sent");
+    } else if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "reset_requested event send failed: %s", esp_err_to_name(ret));
+    }
 }
 
 void app_main(void)

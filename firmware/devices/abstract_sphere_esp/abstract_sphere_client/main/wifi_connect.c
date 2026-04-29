@@ -103,14 +103,7 @@ esp_err_t wifi_connect_start(void)
     ESP_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_STA, &wifi_config), TAG, "Wi-Fi config failed");
     ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "Wi-Fi start failed");
 
-    ESP_LOGI(TAG, "Connecting to SSID '%s'", DEVICE_WIFI_SSID);
-    const EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-                                                 WIFI_CONNECTED_BIT,
-                                                 pdFALSE,
-                                                 pdFALSE,
-                                                 portMAX_DELAY);
-
-    ESP_RETURN_ON_FALSE((bits & WIFI_CONNECTED_BIT) != 0, ESP_FAIL, TAG, "Failed to connect to Wi-Fi");
+    ESP_LOGI(TAG, "Connecting to SSID '%s'; Wi-Fi will keep retrying in the background", DEVICE_WIFI_SSID);
 
     return ESP_OK;
 }

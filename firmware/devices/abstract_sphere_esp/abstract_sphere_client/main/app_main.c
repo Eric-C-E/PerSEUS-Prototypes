@@ -16,7 +16,11 @@ static void motion_reset_event_cb(motion_reset_source_t source, void *user_ctx)
 
     const char *source_name = (source == MOTION_RESET_SOURCE_SHAKE) ? "shake" : "touch";
     ESP_LOGI(TAG, "Motion reset requested by %s", source_name);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(device_client_send_event("reset_requested"));
+
+    esp_err_t ret = device_client_send_event("reset_requested");
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "reset_requested event not sent: %s", esp_err_to_name(ret));
+    }
 }
 
 void app_main(void)
@@ -25,9 +29,9 @@ void app_main(void)
 
     ESP_ERROR_CHECK(lighting_controller_init());
     ESP_ERROR_CHECK(motor_controller_init());
-    ESP_ERROR_CHECK(motion_reset_init(motion_reset_event_cb, NULL));
     ESP_ERROR_CHECK(wifi_connect_start());
     ESP_ERROR_CHECK(device_client_start());
+    ESP_ERROR_CHECK(motion_reset_init(motion_reset_event_cb, NULL));
 
     ESP_LOGI(TAG, "Abstract Sphere TCP client, lighting placeholder, vibration motor, and MPU6050 reset detection are running");
 

@@ -12,8 +12,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/gpio_types.h"
-#include "sdkconfig.h"
 
+#include "sdkconfig.h"
 static const char *TAG = "servo_calibrator";
 
 #define CAL_TILT_GPIO                 GPIO_NUM_6

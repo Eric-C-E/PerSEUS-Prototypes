@@ -12,7 +12,6 @@ idf_component_register(
         esp_event
         esp_netif
         esp_wifi
-        json
         lwip
         nvs_flash
 )

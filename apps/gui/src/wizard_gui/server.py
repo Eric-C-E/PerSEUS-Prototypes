@@ -26,6 +26,7 @@ class TCPServer:
         self.registry = registry
         self.log_callback = log_callback
         self.gui_queue: queue.Queue[dict[str, Any]] = queue.Queue()
+        self._send_queue: queue.Queue[tuple[str, dict[str, Any]] | None] = queue.Queue()
         self._server_socket: socket.socket | None = None
         self._running = False
         self._send_lock = threading.Lock()
@@ -48,10 +49,13 @@ class TCPServer:
 
         thread = threading.Thread(target=self._accept_loop, daemon=True)
         thread.start()
+        send_thread = threading.Thread(target=self._send_loop, daemon=True)
+        send_thread.start()
         self.log(f"[server] Listening on {self.host}:{self.port}")
 
     def stop(self) -> None:
         self._running = False
+        self._send_queue.put(None)
         if self._server_socket is not None:
             try:
                 self._server_socket.close()
@@ -173,6 +177,23 @@ class TCPServer:
         self.gui_queue.put(event)
 
     def send_message(self, device_id: str, message: dict[str, Any]) -> bool:
+        if not self._running:
+            self.log(f"[send] Server not running; dropped command for {device_id}")
+            return False
+
+        self._send_queue.put((device_id, message))
+        return True
+
+    def _send_loop(self) -> None:
+        while self._running:
+            item = self._send_queue.get()
+            if item is None:
+                return
+
+            device_id, message = item
+            self._send_message_now(device_id, message)
+
+    def _send_message_now(self, device_id: str, message: dict[str, Any]) -> bool:
         conn = self.registry.get_live_connection(device_id)
         if conn is None:
             self.log(f"[send] Device not connected: {device_id}")

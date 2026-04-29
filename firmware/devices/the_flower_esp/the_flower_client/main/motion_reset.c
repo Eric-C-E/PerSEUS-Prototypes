@@ -20,12 +20,16 @@ static const char *TAG = "motion_reset";
 #define MPU6050_REG_PWR_MGMT_1           0x6B
 #define MPU6050_REG_WHO_AM_I             0x75
 #define MPU6050_WHO_AM_I_VALUE           0x68
+#define MPU6050_WHO_AM_I_CLONE_VALUE     0x70
 
 #define MPU6050_I2C_TIMEOUT_MS           100
 #define MPU6050_SAMPLE_PERIOD_MS         50
 #define MPU6050_RETRY_PERIOD_MS          2000
 #define MPU6050_SHAKE_DELTA_THRESHOLD    8000
 #define MPU6050_SHAKE_COOLDOWN_MS        1500
+#define MPU6050_SHAKE_REQUIRED_SAMPLES   3
+#define MPU6050_SETTLE_SAMPLES           10
+#define MPU6050_MAX_SAMPLE_FAILURES      3
 
 typedef struct {
     int16_t x;
@@ -40,6 +44,9 @@ typedef struct {
     volatile bool touch_pending;
     bool mpu_ready;
     bool have_last_sample;
+    uint8_t settle_samples_remaining;
+    uint8_t consecutive_shake_samples;
+    uint8_t sample_fail_count;
     TickType_t last_mpu_retry_tick;
     TickType_t last_shake_tick;
     accel_sample_t last_sample;
@@ -63,7 +70,10 @@ static esp_err_t mpu6050_write_byte(uint8_t reg_addr, uint8_t data)
 static esp_err_t mpu6050_read_accel(accel_sample_t *sample)
 {
     uint8_t data[6] = {0};
-    ESP_RETURN_ON_ERROR(mpu6050_read(MPU6050_REG_ACCEL_XOUT_H, data, sizeof(data)), TAG, "read accel failed");
+    esp_err_t ret = mpu6050_read(MPU6050_REG_ACCEL_XOUT_H, data, sizeof(data));
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
     sample->x = (int16_t)((data[0] << 8) | data[1]);
     sample->y = (int16_t)((data[2] << 8) | data[3]);
@@ -74,6 +84,12 @@ static esp_err_t mpu6050_read_accel(accel_sample_t *sample)
 static int32_t abs_i32(int32_t value)
 {
     return (value < 0) ? -value : value;
+}
+
+static bool mpu6050_who_am_i_is_supported(uint8_t who_am_i)
+{
+    return who_am_i == MPU6050_WHO_AM_I_VALUE ||
+           who_am_i == MPU6050_WHO_AM_I_CLONE_VALUE;
 }
 
 static esp_err_t mpu6050_init(void)
@@ -102,7 +118,7 @@ static esp_err_t mpu6050_init(void)
 
     uint8_t who_am_i = 0;
     ESP_RETURN_ON_ERROR(mpu6050_read(MPU6050_REG_WHO_AM_I, &who_am_i, 1), TAG, "MPU6050 WHO_AM_I read failed");
-    ESP_RETURN_ON_FALSE(who_am_i == MPU6050_WHO_AM_I_VALUE,
+    ESP_RETURN_ON_FALSE(mpu6050_who_am_i_is_supported(who_am_i),
                         ESP_ERR_NOT_FOUND,
                         TAG,
                         "unexpected MPU6050 WHO_AM_I 0x%02x",
@@ -115,7 +131,14 @@ static esp_err_t mpu6050_init(void)
     ESP_RETURN_ON_ERROR(mpu6050_write_byte(MPU6050_REG_ACCEL_CONFIG, 0x08), TAG, "MPU6050 accel range config failed");
 
     s_motion_reset.have_last_sample = false;
-    ESP_LOGI(TAG, "MPU6050 initialized on SDA GPIO%d, SCL GPIO%d", BOARD_MPU6050_PIN_SDA, BOARD_MPU6050_PIN_SCL);
+    s_motion_reset.settle_samples_remaining = MPU6050_SETTLE_SAMPLES;
+    s_motion_reset.consecutive_shake_samples = 0;
+    s_motion_reset.sample_fail_count = 0;
+    ESP_LOGI(TAG,
+             "MPU6050 initialized on SDA GPIO%d, SCL GPIO%d, WHO_AM_I 0x%02x",
+             BOARD_MPU6050_PIN_SDA,
+             BOARD_MPU6050_PIN_SCL,
+             who_am_i);
     return ESP_OK;
 }
 
@@ -141,9 +164,32 @@ static void mpu6050_poll(void)
     accel_sample_t sample = {0};
     esp_err_t ret = mpu6050_read_accel(&sample);
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "MPU6050 sample failed: %s", esp_err_to_name(ret));
-        s_motion_reset.mpu_ready = false;
+        s_motion_reset.sample_fail_count++;
+        if (s_motion_reset.sample_fail_count >= MPU6050_MAX_SAMPLE_FAILURES) {
+            ESP_LOGW(TAG,
+                     "MPU6050 sample failed %u times: %s; reinitializing",
+                     s_motion_reset.sample_fail_count,
+                     esp_err_to_name(ret));
+            s_motion_reset.mpu_ready = false;
+            s_motion_reset.sample_fail_count = 0;
+        } else {
+            ESP_LOGD(TAG,
+                     "MPU6050 sample failed %u/%u: %s",
+                     s_motion_reset.sample_fail_count,
+                     MPU6050_MAX_SAMPLE_FAILURES,
+                     esp_err_to_name(ret));
+        }
         s_motion_reset.have_last_sample = false;
+        s_motion_reset.consecutive_shake_samples = 0;
+        return;
+    }
+
+    s_motion_reset.sample_fail_count = 0;
+
+    if (s_motion_reset.settle_samples_remaining > 0) {
+        s_motion_reset.settle_samples_remaining--;
+        s_motion_reset.last_sample = sample;
+        s_motion_reset.have_last_sample = true;
         return;
     }
 
@@ -153,9 +199,18 @@ static void mpu6050_poll(void)
                         abs_i32((int32_t)sample.z - s_motion_reset.last_sample.z);
         bool cooldown_done = (now - s_motion_reset.last_shake_tick) >= pdMS_TO_TICKS(MPU6050_SHAKE_COOLDOWN_MS);
 
-        if (delta >= MPU6050_SHAKE_DELTA_THRESHOLD && cooldown_done) {
+        if (delta >= MPU6050_SHAKE_DELTA_THRESHOLD) {
+            if (s_motion_reset.consecutive_shake_samples < UINT8_MAX) {
+                s_motion_reset.consecutive_shake_samples++;
+            }
+        } else {
+            s_motion_reset.consecutive_shake_samples = 0;
+        }
+
+        if (s_motion_reset.consecutive_shake_samples >= MPU6050_SHAKE_REQUIRED_SAMPLES && cooldown_done) {
             ESP_LOGI(TAG, "MPU6050 shake detected, accel delta=%ld", (long)delta);
             s_motion_reset.last_shake_tick = now;
+            s_motion_reset.consecutive_shake_samples = 0;
             motion_reset_raise_shake_flag();
         }
     }
@@ -199,6 +254,9 @@ esp_err_t motion_reset_init(motion_reset_callback_t callback, void *user_ctx)
     s_motion_reset.touch_pending = false;
     s_motion_reset.mpu_ready = false;
     s_motion_reset.have_last_sample = false;
+    s_motion_reset.settle_samples_remaining = 0;
+    s_motion_reset.consecutive_shake_samples = 0;
+    s_motion_reset.sample_fail_count = 0;
     s_motion_reset.last_mpu_retry_tick = 0;
     s_motion_reset.last_shake_tick = 0;
     s_motion_reset.i2c_bus = NULL;

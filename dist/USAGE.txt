@@ -1,0 +1,29 @@
+Perseus Wizard Controller - Windows Usage
+
+Contents:
+- PerseusWizardController.exe
+- USAGE.txt
+
+How to run:
+1. Copy or extract this folder onto a Windows computer.
+2. Double-click PerseusWizardController.exe.
+3. If Windows SmartScreen appears, choose "More info" and then "Run anyway".
+   This can happen because the executable is not code-signed.
+4. If Windows Firewall asks for network access, allow access on Private networks.
+
+What the program does:
+- Opens the Wizard-of-Oz Controller GUI.
+- Starts a TCP server on port 9000.
+- Accepts device connections on all local network interfaces.
+
+Connecting ESP32 devices:
+1. Start the Windows computer's Wi-Fi hotspot.
+2. Connect the ESP32 device to that hotspot.
+3. On the Windows computer, run ipconfig and find the hotspot adapter IPv4 address.
+   This is commonly 192.168.137.1.
+4. Configure the ESP32 client to connect to that IPv4 address on TCP port 9000.
+
+Notes:
+- Python does not need to be installed on the receiving computer.
+- Send the zip file or the executable plus this usage file.
+- The executable was built for 64-bit Windows.

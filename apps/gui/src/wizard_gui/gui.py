@@ -21,6 +21,9 @@ from .server import TCPServer
 
 
 HEARTBEAT_ACTIVE_SECONDS = 12.0
+MAX_LOG_LINES = 500
+MAX_EVENTS_PER_POLL = 200
+MAX_LOGS_PER_POLL = 100
 
 
 class WizardGUI:
@@ -31,6 +34,7 @@ class WizardGUI:
         self.server.log_callback = self.log
 
         self.selected_device_id: str | None = None
+        self.selected_device_kind: str | None = None
         self.abstract_vibration_on = False
         self.abstract_vibration_level_var = tk.DoubleVar(value=0.65)
 
@@ -40,6 +44,9 @@ class WizardGUI:
         self.flower_tilt_var = tk.DoubleVar(value=0.5)
         self.reset_light_canvas: tk.Canvas | None = None
         self.reset_light_oval: int | None = None
+        self._log_queue: queue.Queue[str] = queue.Queue()
+        self._log_line_count = 0
+        self._variable_trace_tokens: list[tuple[tk.Variable, str]] = []
         self._last_periodic_refresh = 0.0
 
         self.root.title("Wizard-of-Oz Controller")
@@ -129,24 +136,49 @@ class WizardGUI:
         self.log_text.grid(row=0, column=0, sticky="nsew")
 
     def log(self, message: str) -> None:
-        self.root.after(0, self._append_log, message)
+        self._log_queue.put(message)
 
-    def _append_log(self, message: str) -> None:
+    def _append_log_batch(self, messages: list[str]) -> None:
+        if not messages:
+            return
+
         self.log_text.configure(state="normal")
-        self.log_text.insert("end", message + "\n")
+        self.log_text.insert("end", "\n".join(messages) + "\n")
+        self._log_line_count += len(messages)
+        if self._log_line_count > MAX_LOG_LINES:
+            lines_to_remove = self._log_line_count - MAX_LOG_LINES
+            self.log_text.delete("1.0", f"{lines_to_remove + 1}.0")
+            self._log_line_count = MAX_LOG_LINES
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
     def poll_server_events(self) -> None:
-        while True:
+        refresh_needed = False
+        reset_light_needed = False
+
+        for _ in range(MAX_EVENTS_PER_POLL):
             try:
                 event = self.server.gui_queue.get_nowait()
             except queue.Empty:
                 break
 
             if event.get("kind") == "device_list_changed":
-                self.refresh_device_list()
-                self.update_reset_light()
+                refresh_needed = True
+                reset_light_needed = True
+
+        log_messages: list[str] = []
+        for _ in range(MAX_LOGS_PER_POLL):
+            try:
+                log_messages.append(self._log_queue.get_nowait())
+            except queue.Empty:
+                break
+
+        self._append_log_batch(log_messages)
+
+        if refresh_needed:
+            self.refresh_device_list()
+        if reset_light_needed:
+            self.update_reset_light()
 
         now = time.monotonic()
         if now - self._last_periodic_refresh >= 1.0:
@@ -187,6 +219,7 @@ class WizardGUI:
             self.device_tree.focus(selected)
         elif selected and not self.device_tree.exists(selected):
             self.selected_device_id = None
+            self.selected_device_kind = None
             self.show_no_selection()
 
     def _heartbeat_active(self, device: dict[str, object]) -> bool:
@@ -208,32 +241,58 @@ class WizardGUI:
         selection = self.device_tree.selection()
         if not selection:
             self.selected_device_id = None
+            self.selected_device_kind = None
             self.show_no_selection()
             return
 
         device_id = selection[0]
-        self.selected_device_id = device_id
         device = self.registry.get(device_id)
         if device is None:
+            self.selected_device_id = None
+            self.selected_device_kind = None
             self.show_no_selection()
             return
 
+        if (
+            device_id == self.selected_device_id
+            and device.device_kind == self.selected_device_kind
+        ):
+            self.selected_label.configure(
+                text=f"Selected: {device.device_id} ({device.device_kind})"
+            )
+            self.update_reset_light()
+            return
+
+        self.selected_device_id = device_id
+        self.selected_device_kind = device.device_kind
         self.selected_label.configure(
             text=f"Selected: {device.device_id} ({device.device_kind})"
         )
         self.show_controls_for_kind(device.device_kind)
 
     def clear_dynamic_controls(self) -> None:
+        for variable, token in self._variable_trace_tokens:
+            try:
+                variable.trace_remove("write", token)
+            except tk.TclError:
+                pass
+        self._variable_trace_tokens.clear()
+
         for child in self.dynamic_controls.winfo_children():
             child.destroy()
         self.reset_light_canvas = None
         self.reset_light_oval = None
+
+    def _add_variable_trace(self, variable: tk.Variable, callback: Any) -> None:
+        token = variable.trace_add("write", callback)
+        self._variable_trace_tokens.append((variable, token))
 
     def show_no_selection(self) -> None:
         self.clear_dynamic_controls()
         label = ttk.Label(self.dynamic_controls, text="Select a device from the list.")
         label.grid(row=0, column=0, sticky="w")
         self.selected_label.configure(text="No device selected")
+        self.selected_device_kind = None
 
     def show_controls_for_kind(self, device_kind: str) -> None:
         self.clear_dynamic_controls()
@@ -338,9 +397,11 @@ class WizardGUI:
         level_label.grid(row=3, column=0, sticky="w", pady=(4, 4))
 
         def update_level_label(*_args: object) -> None:
+            if not level_label.winfo_exists():
+                return
             level_label.configure(text=f"level={self.abstract_vibration_level_var.get():.2f}")
 
-        self.abstract_vibration_level_var.trace_add("write", update_level_label)
+        self._add_variable_trace(self.abstract_vibration_level_var, update_level_label)
 
         send_level_button = ttk.Button(
             vibration_frame,
@@ -386,14 +447,16 @@ class WizardGUI:
         value_label.grid(row=3, column=0, columnspan=2, sticky="w", pady=(4, 4))
 
         def update_value_label(*_args: object) -> None:
+            if not value_label.winfo_exists():
+                return
             value_label.configure(
                 text=self._format_flower_values(
                     self.flower_speed_var.get(), self.flower_amplitude_var.get()
                 )
             )
 
-        self.flower_speed_var.trace_add("write", update_value_label)
-        self.flower_amplitude_var.trace_add("write", update_value_label)
+        self._add_variable_trace(self.flower_speed_var, update_value_label)
+        self._add_variable_trace(self.flower_amplitude_var, update_value_label)
 
         send_button = ttk.Button(
             raw_frame,
@@ -427,9 +490,11 @@ class WizardGUI:
         value_label.grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 4))
 
         def update_value_label(*_args: object) -> None:
+            if not value_label.winfo_exists():
+                return
             value_label.configure(text=self._format_flower_tilt(self.flower_tilt_var.get()))
 
-        self.flower_tilt_var.trace_add("write", update_value_label)
+        self._add_variable_trace(self.flower_tilt_var, update_value_label)
 
         send_button = ttk.Button(
             tilt_frame,

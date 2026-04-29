@@ -24,14 +24,19 @@ static const char *TAG = "device_client";
 
 #define DEVICE_CLIENT_RX_BUF_SIZE 512
 #define DEVICE_CLIENT_LINE_BUF_SIZE 512
+#define DEVICE_CLIENT_EVENT_NAME_SIZE 64
 
 static int s_socket_fd = -1;
 static SemaphoreHandle_t s_socket_lock;
+static char s_pending_event[DEVICE_CLIENT_EVENT_NAME_SIZE];
 
 static esp_err_t send_json_line(const char *json_line)
 {
     ESP_RETURN_ON_FALSE(json_line, ESP_ERR_INVALID_ARG, TAG, "json_line is NULL");
-    ESP_RETURN_ON_FALSE(s_socket_lock, ESP_ERR_INVALID_STATE, TAG, "socket lock is not initialized");
+
+    if (!s_socket_lock) {
+        return ESP_ERR_INVALID_STATE;
+    }
 
     esp_err_t ret = ESP_OK;
     xSemaphoreTake(s_socket_lock, portMAX_DELAY);
@@ -81,7 +86,16 @@ esp_err_t device_client_send_event(const char *event_name)
              "{\"type\":\"event\",\"device_id\":\"%s\",\"event\":\"%s\"}",
              DEVICE_CLIENT_ID,
              event_name);
-    return send_json_line(msg);
+    esp_err_t ret = send_json_line(msg);
+    if (ret == ESP_ERR_INVALID_STATE && s_socket_lock) {
+        xSemaphoreTake(s_socket_lock, portMAX_DELAY);
+        snprintf(s_pending_event, sizeof(s_pending_event), "%s", event_name);
+        xSemaphoreGive(s_socket_lock);
+        ESP_LOGW(TAG, "Queued event '%s' until GUI connection is available", event_name);
+        ret = ESP_OK;
+    }
+
+    return ret;
 }
 
 static bool json_string_equals(const cJSON *obj, const char *name, const char *expected)
@@ -264,6 +278,19 @@ static void device_client_task(void *arg)
 
         ESP_LOGI(TAG, "Connected to GUI");
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_hello());
+
+        char pending_event[DEVICE_CLIENT_EVENT_NAME_SIZE] = {0};
+        xSemaphoreTake(s_socket_lock, portMAX_DELAY);
+        if (s_pending_event[0] != '\0') {
+            snprintf(pending_event, sizeof(pending_event), "%s", s_pending_event);
+            s_pending_event[0] = '\0';
+        }
+        xSemaphoreGive(s_socket_lock);
+
+        if (pending_event[0] != '\0') {
+            ESP_LOGI(TAG, "Sending queued event '%s'", pending_event);
+            ESP_ERROR_CHECK_WITHOUT_ABORT(device_client_send_event(pending_event));
+        }
 
         size_t line_len = 0;
         TickType_t last_heartbeat = 0;

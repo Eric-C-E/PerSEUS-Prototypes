@@ -21,10 +21,11 @@
 #define BOARD_SERVO_MAX_PULSE_US          2500
 #define BOARD_SERVO_PERIOD_US             20000
 
-#define BOARD_SERVO_TILT_MIN_DEG          0.0f
+#define BOARD_SERVO_TILT_MIN_DEG          78.0f
 #define BOARD_SERVO_TILT_CENTER_DEG       90.0f
-#define BOARD_SERVO_TILT_MAX_DEG          180.0f
+#define BOARD_SERVO_TILT_MAX_DEG          102.0f
 #define BOARD_SERVO_TILT_REVERSED         0
+#define BOARD_SERVO_TILT_MAX_SPEED_DEG_PER_SEC 8.0f
 
 #define BOARD_SERVO_ROTATION_MIN_DEG      0.0f
 #define BOARD_SERVO_ROTATION_CENTER_DEG   90.0f
@@ -33,7 +34,7 @@
 
 #define BOARD_SERVO_UPDATE_PERIOD_MS      20
 #define BOARD_SERVO_RAW_MIN_HZ            0.10f
-#define BOARD_SERVO_RAW_MAX_HZ            1.50f
+#define BOARD_SERVO_RAW_MAX_HZ            1.00f
 
 /*
  * Shared motion-reset IMU configuration.

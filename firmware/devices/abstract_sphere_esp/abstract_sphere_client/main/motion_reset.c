@@ -19,7 +19,6 @@ static const char *TAG = "motion_reset";
 #define MPU6050_REG_ACCEL_XOUT_H         0x3B
 #define MPU6050_REG_PWR_MGMT_1           0x6B
 #define MPU6050_REG_WHO_AM_I             0x75
-#define MPU6050_WHO_AM_I_VALUE           0x68
 
 #define MPU6050_I2C_TIMEOUT_MS           100
 #define MPU6050_SAMPLE_PERIOD_MS         50
@@ -48,6 +47,24 @@ typedef struct {
 } motion_reset_ctx_t;
 
 static motion_reset_ctx_t s_motion_reset;
+
+static const char *mpu6050_get_device_name(uint8_t who_am_i)
+{
+    switch (who_am_i) {
+    case 0x68:
+        return "MPU-6050";
+    case 0x70:
+        return "MPU-6500";
+    case 0x71:
+        return "MPU-9250";
+    case 0x73:
+        return "MPU-9255";
+    case 0x74:
+        return "MPU-9515";
+    default:
+        return NULL;
+    }
+}
 
 static esp_err_t mpu6050_read(uint8_t reg_addr, uint8_t *data, size_t len)
 {
@@ -102,8 +119,9 @@ static esp_err_t mpu6050_init(void)
 
     uint8_t who_am_i = 0;
     ESP_RETURN_ON_ERROR(mpu6050_read(MPU6050_REG_WHO_AM_I, &who_am_i, 1), TAG, "MPU6050 WHO_AM_I read failed");
-    ESP_RETURN_ON_FALSE(who_am_i == MPU6050_WHO_AM_I_VALUE, ESP_ERR_NOT_FOUND, TAG,
-                        "unexpected MPU6050 WHO_AM_I 0x%02x", who_am_i);
+    const char *device_name = mpu6050_get_device_name(who_am_i);
+    ESP_RETURN_ON_FALSE(device_name != NULL, ESP_ERR_NOT_FOUND, TAG,
+                        "unexpected MPU-family WHO_AM_I 0x%02x", who_am_i);
 
     ESP_RETURN_ON_ERROR(mpu6050_write_byte(MPU6050_REG_PWR_MGMT_1, 0x00), TAG, "MPU6050 wake failed");
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -112,7 +130,7 @@ static esp_err_t mpu6050_init(void)
     ESP_RETURN_ON_ERROR(mpu6050_write_byte(MPU6050_REG_ACCEL_CONFIG, 0x08), TAG, "MPU6050 accel range config failed");
 
     s_motion_reset.have_last_sample = false;
-    ESP_LOGI(TAG, "MPU6050 initialized on SDA GPIO%d, SCL GPIO%d", BOARD_MPU6050_PIN_SDA, BOARD_MPU6050_PIN_SCL);
+    ESP_LOGI(TAG, "%s initialized on SDA GPIO%d, SCL GPIO%d", device_name, BOARD_MPU6050_PIN_SDA, BOARD_MPU6050_PIN_SCL);
     return ESP_OK;
 }
 
