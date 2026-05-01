@@ -44,6 +44,8 @@ class WizardGUI:
         self.flower_tilt_var = tk.DoubleVar(value=0.5)
         self.reset_light_canvas: tk.Canvas | None = None
         self.reset_light_oval: int | None = None
+        self.controls_canvas: tk.Canvas | None = None
+        self.controls_window_id: int | None = None
         self._log_queue: queue.Queue[str] = queue.Queue()
         self._log_line_count = 0
         self._variable_trace_tokens: list[tuple[tk.Variable, str]] = []
@@ -121,10 +123,55 @@ class WizardGUI:
         self.selected_label = ttk.Label(self.control_container, text="No device selected")
         self.selected_label.grid(row=0, column=0, sticky="w", pady=(0, 8))
 
-        self.dynamic_controls = ttk.Frame(self.control_container)
-        self.dynamic_controls.grid(row=1, column=0, sticky="nsew")
+        self.controls_canvas = tk.Canvas(
+            self.control_container,
+            borderwidth=0,
+            highlightthickness=0,
+        )
+        controls_scrollbar = ttk.Scrollbar(
+            self.control_container,
+            orient="vertical",
+            command=self.controls_canvas.yview,
+        )
+        self.controls_canvas.configure(yscrollcommand=controls_scrollbar.set)
+        self.controls_canvas.grid(row=1, column=0, sticky="nsew")
+        controls_scrollbar.grid(row=1, column=1, sticky="ns")
+
+        self.dynamic_controls = ttk.Frame(self.controls_canvas)
+        self.dynamic_controls.columnconfigure(0, weight=1)
+        self.controls_window_id = self.controls_canvas.create_window(
+            (0, 0),
+            window=self.dynamic_controls,
+            anchor="nw",
+        )
+        self.dynamic_controls.bind("<Configure>", self._update_controls_scroll_region)
+        self.controls_canvas.bind("<Configure>", self._resize_controls_window)
+        self.controls_canvas.bind("<MouseWheel>", self._on_controls_mousewheel)
+        self.dynamic_controls.bind("<MouseWheel>", self._on_controls_mousewheel)
 
         self.show_no_selection()
+
+    def _update_controls_scroll_region(self, _event: tk.Event) -> None:
+        if self.controls_canvas is None:
+            return
+        self.controls_canvas.configure(scrollregion=self.controls_canvas.bbox("all"))
+        self._bind_controls_mousewheel_handlers(self.dynamic_controls)
+
+    def _resize_controls_window(self, event: tk.Event) -> None:
+        if self.controls_canvas is None or self.controls_window_id is None:
+            return
+        self.controls_canvas.itemconfigure(self.controls_window_id, width=event.width)
+
+    def _bind_controls_mousewheel_handlers(self, widget: tk.Widget) -> None:
+        widget.bind("<MouseWheel>", self._on_controls_mousewheel)
+        for child in widget.winfo_children():
+            self._bind_controls_mousewheel_handlers(child)
+
+    def _on_controls_mousewheel(self, event: tk.Event) -> str:
+        if self.controls_canvas is None:
+            return "break"
+        self.controls_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        return "break"
 
     def _build_log_panel(self) -> None:
         frame = ttk.LabelFrame(self.root, text="Debug Log", padding=8)
@@ -282,6 +329,8 @@ class WizardGUI:
             child.destroy()
         self.reset_light_canvas = None
         self.reset_light_oval = None
+        if self.controls_canvas is not None:
+            self.controls_canvas.yview_moveto(0.0)
 
     def _add_variable_trace(self, variable: tk.Variable, callback: Any) -> None:
         token = variable.trace_add("write", callback)

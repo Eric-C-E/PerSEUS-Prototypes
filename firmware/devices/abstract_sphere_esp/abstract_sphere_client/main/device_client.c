@@ -19,6 +19,7 @@
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "motor_controller.h"
+#include "wifi_connect.h"
 
 static const char *TAG = "device_client";
 
@@ -212,16 +213,44 @@ static void handle_command_line(const char *line)
     cJSON_Delete(root);
 }
 
-static int connect_to_gui(void)
+static bool resolve_gui_address(struct sockaddr_in *dest_addr, char *host_label, size_t host_label_size)
 {
-    struct sockaddr_in dest_addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(DEVICE_CLIENT_GUI_PORT),
-    };
+    ESP_RETURN_ON_FALSE(dest_addr, false, TAG, "dest_addr is NULL");
+    ESP_RETURN_ON_FALSE(host_label, false, TAG, "host_label is NULL");
 
-    int inet_ok = inet_pton(AF_INET, DEVICE_CLIENT_GUI_HOST, &dest_addr.sin_addr);
+    memset(dest_addr, 0, sizeof(*dest_addr));
+    dest_addr->sin_family = AF_INET;
+    dest_addr->sin_port = htons(DEVICE_CLIENT_GUI_PORT);
+
+#if DEVICE_CLIENT_GUI_USE_WIFI_GATEWAY
+    esp_netif_ip_info_t ip_info;
+    esp_err_t ret = wifi_connect_get_ip_info(&ip_info);
+    if (ret == ESP_OK && ip_info.gw.addr != 0) {
+        dest_addr->sin_addr.s_addr = ip_info.gw.addr;
+        snprintf(host_label, host_label_size, IPSTR " (Wi-Fi gateway)", IP2STR(&ip_info.gw));
+        return true;
+    }
+
+    ESP_LOGW(TAG,
+             "Wi-Fi gateway unavailable (%s); falling back to configured GUI host %s",
+             esp_err_to_name(ret),
+             DEVICE_CLIENT_GUI_HOST);
+#endif
+
+    int inet_ok = inet_pton(AF_INET, DEVICE_CLIENT_GUI_HOST, &dest_addr->sin_addr);
     if (inet_ok != 1) {
         ESP_LOGE(TAG, "DEVICE_CLIENT_GUI_HOST must be an IPv4 address: %s", DEVICE_CLIENT_GUI_HOST);
+        return false;
+    }
+    snprintf(host_label, host_label_size, "%s", DEVICE_CLIENT_GUI_HOST);
+    return true;
+}
+
+static int connect_to_gui(void)
+{
+    struct sockaddr_in dest_addr;
+    char host_label[64];
+    if (!resolve_gui_address(&dest_addr, host_label, sizeof(host_label))) {
         return -1;
     }
 
@@ -237,7 +266,7 @@ static int connect_to_gui(void)
     };
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
 
-    ESP_LOGI(TAG, "Connecting to GUI %s:%d", DEVICE_CLIENT_GUI_HOST, DEVICE_CLIENT_GUI_PORT);
+    ESP_LOGI(TAG, "Connecting to GUI %s:%d", host_label, DEVICE_CLIENT_GUI_PORT);
     if (connect(sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
         ESP_LOGW(TAG, "connect failed: errno=%d", errno);
         close(sock);

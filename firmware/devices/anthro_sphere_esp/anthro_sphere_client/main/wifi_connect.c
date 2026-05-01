@@ -31,9 +31,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     }
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        const wifi_event_sta_disconnected_t *event = (const wifi_event_sta_disconnected_t *)event_data;
         if (s_retry_count < WIFI_MAX_RETRY) {
             s_retry_count++;
-            ESP_LOGW(TAG, "Wi-Fi disconnected; retry %d/%d", s_retry_count, WIFI_MAX_RETRY);
+            ESP_LOGW(TAG,
+                     "Wi-Fi disconnected from '%s': reason=%u; retry %d/%d",
+                     DEVICE_WIFI_SSID,
+                     event->reason,
+                     s_retry_count,
+                     WIFI_MAX_RETRY);
             esp_wifi_connect();
         } else {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
@@ -89,7 +95,7 @@ esp_err_t wifi_connect_start(void)
 
     wifi_config_t wifi_config = {
         .sta = {
-            .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+            .threshold.authmode = WIFI_AUTH_WPA_PSK,
         },
     };
     strncpy((char *)wifi_config.sta.ssid, DEVICE_WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);

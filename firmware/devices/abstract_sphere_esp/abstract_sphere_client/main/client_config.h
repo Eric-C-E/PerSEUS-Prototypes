@@ -6,6 +6,7 @@
 
 #define DEVICE_CLIENT_ID              "abstract_01"
 #define DEVICE_CLIENT_KIND            "abstract_sphere"
+#define DEVICE_CLIENT_GUI_USE_WIFI_GATEWAY 1
 #define DEVICE_CLIENT_GUI_HOST        "192.168.137.1"
 #define DEVICE_CLIENT_GUI_PORT        9000
 

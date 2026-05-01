@@ -19,6 +19,7 @@ static const char *TAG = "wifi_connect";
 #define WIFI_RETRY_LOG_PERIOD 10
 
 static EventGroupHandle_t s_wifi_event_group;
+static esp_netif_t *s_wifi_netif;
 static uint32_t s_retry_count;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -69,7 +70,8 @@ esp_err_t wifi_connect_start(void)
 
     ESP_RETURN_ON_ERROR(esp_netif_init(), TAG, "esp_netif init failed");
     ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG, "event loop init failed");
-    esp_netif_create_default_wifi_sta();
+    s_wifi_netif = esp_netif_create_default_wifi_sta();
+    ESP_RETURN_ON_FALSE(s_wifi_netif != NULL, ESP_FAIL, TAG, "default Wi-Fi station netif creation failed");
 
     const wifi_init_config_t init_config = WIFI_INIT_CONFIG_DEFAULT();
     ESP_RETURN_ON_ERROR(esp_wifi_init(&init_config), TAG, "Wi-Fi init failed");
@@ -106,4 +108,12 @@ esp_err_t wifi_connect_start(void)
     ESP_LOGI(TAG, "Connecting to SSID '%s'; Wi-Fi will keep retrying in the background", DEVICE_WIFI_SSID);
 
     return ESP_OK;
+}
+
+esp_err_t wifi_connect_get_ip_info(esp_netif_ip_info_t *out_info)
+{
+    ESP_RETURN_ON_FALSE(out_info != NULL, ESP_ERR_INVALID_ARG, TAG, "out_info is NULL");
+    ESP_RETURN_ON_FALSE(s_wifi_netif != NULL, ESP_ERR_INVALID_STATE, TAG, "Wi-Fi netif is not initialized");
+
+    return esp_netif_get_ip_info(s_wifi_netif, out_info);
 }
