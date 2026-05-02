@@ -112,25 +112,25 @@ static void state_to_motion(flower_state_t state, float *speed, float *amplitude
 {
     switch (state) {
     case FLOWER_STATE_HIGH_POSITIVE:
-        *speed = 1.0f;
-        *amplitude = 0.85f;
+        *speed = 0.20f;
+        *amplitude = 0.45f;
         break;
     case FLOWER_STATE_LOW_POSITIVE:
-        *speed = 0.20f;
-        *amplitude = 0.85f;
+        *speed = 0.05f;
+        *amplitude = 0.45f;
         break;
     case FLOWER_STATE_HIGH_NEGATIVE:
-        *speed = 1.0f;
-        *amplitude = 0.25f;
+        *speed = 0.70f;
+        *amplitude = 0.15f;
         break;
     case FLOWER_STATE_LOW_NEGATIVE:
-        *speed = 0.20f;
-        *amplitude = 0.25f;
+        *speed = 0.10f;
+        *amplitude = 0.15f;
         break;
     case FLOWER_STATE_NEUTRAL:
     default:
-        *speed = 0.50f;
-        *amplitude = 0.50f;
+        *speed = 0.15f;
+        *amplitude = 0.24f;
         break;
     }
 }
